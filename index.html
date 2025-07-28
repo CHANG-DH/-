@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주점 이름 - 메뉴판</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #333; }
+        .menu-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 15px 0; }
+        .menu-info { flex-grow: 1; }
+        .menu-name { font-weight: bold; font-size: 1.1em; }
+        .menu-price { color: #888; }
+        .quantity-control { display: flex; align-items: center; }
+        .quantity-control button { width: 30px; height: 30px; border: 1px solid #ddd; background-color: #f9f9f9; cursor: pointer; font-size: 1.2em;}
+        .quantity { padding: 0 15px; font-size: 1.1em; }
+        #order-form { margin-top: 30px; text-align: center; }
+        #table-number { width: 95%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
+        #order-button { background-color: #ff5722; color: white; padding: 15px 0; border: none; border-radius: 5px; width: 100%; font-size: 1.2em; cursor: pointer; }
+        #total-price { text-align: right; margin-top: 20px; font-size: 1.3em; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🍻 주점 이름 🍻</h1>
+    <h2>메뉴판</h2>
+    <div id="menu-list"></div>
+    <div id="total-price">총 금액: 0원</div>
+    <div id="order-form">
+        <input type="number" id="table-number" placeholder="테이블 번호를 꼭 입력해주세요!">
+        <button id="order-button">주문하기</button>
+    </div>
+</div>
+
+<script>
+    // ⚠️ 판매할 메뉴와 가격을 여기서 수정하세요.
+    const menuData = [
+        { name: '제육볶음', price: 12000 },
+        { name: '해물파전', price: 10000 },
+        { name: '김치찌개', price: 11000 },
+        { name: '소주', price: 5000 },
+        { name: '맥주', price: 5000 }
+    ];
+
+    // ⚠️ 여기에 3단계에서 복사한 '새로운 웹 앱 URL'을 붙여넣으세요!
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbysQRMkcc7SmVlE9HU-ATnKPcqGztarEoV8cNJiR2p_oD00LA3s7Cc-qQQ3KZQqFDeeDw/exec';
+
+    const menuList = document.getElementById('menu-list');
+    const totalPriceElement = document.getElementById('total-price');
+    const orderButton = document.getElementById('order-button');
+    const tableNumberInput = document.getElementById('table-number');
+    let order = {};
+
+    function renderMenu() {
+        menuData.forEach((item, index) => {
+            order[index] = { ...item, quantity: 0 };
+            const menuItem = document.createElement('div');
+            menuItem.className = 'menu-item';
+            menuItem.innerHTML = `
+                <div class="menu-info">
+                    <div class="menu-name">${item.name}</div>
+                    <div class="menu-price">${item.price.toLocaleString()}원</div>
+                </div>
+                <div class="quantity-control">
+                    <button onclick="changeQuantity(${index}, -1)">-</button>
+                    <span id="quantity-${index}" class="quantity">0</span>
+                    <button onclick="changeQuantity(${index}, 1)">+</button>
+                </div>
+            `;
+            menuList.appendChild(menuItem);
+        });
+    }
+
+    function changeQuantity(index, delta) {
+        if (order[index].quantity + delta >= 0) {
+            order[index].quantity += delta;
+            document.getElementById(`quantity-${index}`).innerText = order[index].quantity;
+            updateTotalPrice();
+        }
+    }
+
+    function updateTotalPrice() {
+        let total = Object.values(order).reduce((sum, item) => sum + item.price * item.quantity, 0);
+        totalPriceElement.innerText = `총 금액: ${total.toLocaleString()}원`;
+    }
+
+    orderButton.addEventListener('click', () => {
+        const tableNumber = tableNumberInput.value;
+        if (!tableNumber) {
+            alert('테이블 번호를 입력해주세요!');
+            return;
+        }
+        const itemsToOrder = Object.values(order).filter(item => item.quantity > 0);
+        if (itemsToOrder.length === 0) {
+            alert('메뉴를 1개 이상 선택해주세요!');
+            return;
+        }
+        const totalAmount = itemsToOrder.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const orderData = {
+            tableNumber: tableNumber,
+            totalAmount: totalAmount,
+            items: itemsToOrder.map(item => ({ name: item.name, quantity: item.quantity }))
+        };
+
+        orderButton.disabled = true;
+        orderButton.innerText = '주문 처리 중...';
+
+        fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(orderData),
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.result === 'success'){
+                alert('주문이 성공적으로 접수되었습니다!');
+                location.reload();
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('주문 실패:', error);
+            alert('주문 접수 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+            orderButton.disabled = false;
+            orderButton.innerText = '주문하기';
+        });
+    });
+
+    renderMenu();
+</script>
+</body>
+</html>
